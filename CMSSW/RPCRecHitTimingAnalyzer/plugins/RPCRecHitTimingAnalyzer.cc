@@ -23,14 +23,21 @@
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
 #include "FWCore/Framework/interface/one/EDAnalyzer.h"
-
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
-
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
- #include "FWCore/Utilities/interface/InputTag.h"
- #include "DataFormats/TrackReco/interface/Track.h"
- #include "DataFormats/TrackReco/interface/TrackFwd.h"
+#include "FWCore/Utilities/interface/InputTag.h"
+#include "DataFormats/TrackReco/interface/Track.h"
+#include "DataFormats/TrackReco/interface/TrackFwd.h"
+#include "DataFormats/MuonReco/interface/Muon.h"
+#include "DataFormats/MuonReco/interface/MuonFwd.h"
+#include "DataFormats/RPCRecHit/interface/RPCRecHitCollection.h"
+
+#include <TFile.h>
+#include <TTree.h>
+
+#include "RPCDPG/RPCRecHitTimingAnalyzer/interface/myRPCRecHitTimingEvent.h"
+
 //
 // class declaration
 //
@@ -40,24 +47,33 @@
 // from  edm::one::EDAnalyzer<>
 // This will improve performance in multithreaded jobs.
 
-
 using reco::TrackCollection;
+using reco::MuonCollection;
 
 class RPCRecHitTimingAnalyzer : public edm::one::EDAnalyzer<edm::one::SharedResources>  {
-   public:
-      explicit RPCRecHitTimingAnalyzer(const edm::ParameterSet&);
-      ~RPCRecHitTimingAnalyzer();
+public:
+  explicit RPCRecHitTimingAnalyzer(const edm::ParameterSet&);
+  ~RPCRecHitTimingAnalyzer();
+  
+  static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
+  
+private:
+  virtual void beginJob() override;
+  virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
+  virtual void endJob() override;
+  
+  // ----------member data ---------------------------
+  edm::InputTag muonlabel_;
+  edm::InputTag muontracklabel_;
+  edm::InputTag rpcrechitlabel_;
+  
+  edm::EDGetTokenT<reco::MuonCollection> muonToken_;  
+  edm::EDGetTokenT<reco::TrackCollection> muontrackToken_;  
+  edm::EDGetTokenT<RPCRecHitCollection> rpcrechitToken_;
 
-      static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
-
-
-   private:
-      virtual void beginJob() override;
-      virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
-      virtual void endJob() override;
-
-      // ----------member data ---------------------------
-      edm::EDGetTokenT<TrackCollection> tracksToken_;  //used to select what tracks to read from configuration file
+  TFile* OutputFile;
+  TTree* myTree;
+  myRPCRecHitTimingEvent_t myRPCRecHitTimingEvent;
 };
 
 //
@@ -72,14 +88,16 @@ class RPCRecHitTimingAnalyzer : public edm::one::EDAnalyzer<edm::one::SharedReso
 // constructors and destructor
 //
 RPCRecHitTimingAnalyzer::RPCRecHitTimingAnalyzer(const edm::ParameterSet& iConfig)
- :
-  tracksToken_(consumes<TrackCollection>(iConfig.getUntrackedParameter<edm::InputTag>("tracks")))
-
 {
-   //now do what ever initialization is needed
+  muonlabel_ = iConfig.getParameter<edm::ParameterSet>("RPCRecHitTimingParameters").getUntrackedParameter<edm::InputTag>("muons");
+  muontracklabel_ = iConfig.getParameter<edm::ParameterSet>("RPCRecHitTimingParameters").getUntrackedParameter<edm::InputTag>("muontracks");
+  //rpcrechitlabel_ = iConfig.getParameter<edm::ParameterSet>("RPCRecHitTimingParameters").getUntrackedParameter<edm::InputTag>("rpcrechits");
+
+  muonToken_ = consumes<reco::MuonCollection>(muonlabel_);
+  muontrackToken_ = consumes<reco::TrackCollection>(muontracklabel_);
+  rpcrechitToken_ = consumes<RPCRecHitCollection>(iConfig.getParameter<edm::ParameterSet>("RPCRecHitTimingParameters").getUntrackedParameter<edm::InputTag>("rpcrechits"));
 
 }
-
 
 RPCRecHitTimingAnalyzer::~RPCRecHitTimingAnalyzer()
 {
@@ -88,7 +106,6 @@ RPCRecHitTimingAnalyzer::~RPCRecHitTimingAnalyzer()
    // (e.g. close files, deallocate resources etc.)
 
 }
-
 
 //
 // member functions
@@ -99,16 +116,28 @@ void
 RPCRecHitTimingAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
    using namespace edm;
+   using namespace std;
 
-    Handle<TrackCollection> tracks;
-    iEvent.getByToken(tracksToken_, tracks);
-    for(TrackCollection::const_iterator itTrack = tracks->begin();
-        itTrack != tracks->end();
-        ++itTrack) {
-      // do something with track parameters, e.g, plot the charge.
-      // int charge = itTrack->charge();
-    }
+   myRPCRecHitTimingEvent.NRPCRecHit = 0;
+   myRPCRecHitTimingEvent.NMuon = 0;
+   myRPCRecHitTimingEvent.Event = (Int_t) iEvent.id().event();
+   myRPCRecHitTimingEvent.Run = (Int_t) iEvent.id().run();
 
+   cout << "Working on event number: " << iEvent.id().event() << endl;
+
+   Handle<reco::MuonCollection> muons;
+   iEvent.getByToken(muonToken_, muons);
+   for (MuonCollection::const_iterator itMuon = muons->begin();
+       itMuon != muons->end();
+       ++itMuon) {
+     myRPCRecHitTimingEvent.MuonCharge[myRPCRecHitTimingEvent.NMuon] = (Int_t) itMuon->charge();
+
+     reco::MuonTime muonrpctime = itMuon->rpcTime();
+     myRPCRecHitTimingEvent.MuonRPCTimeAtIpInOut[myRPCRecHitTimingEvent.NMuon] = (Float_t) muonrpctime.timeAtIpInOut;
+     myRPCRecHitTimingEvent.NMuon++;
+   }
+
+   /*
 #ifdef THIS_IS_AN_EVENT_EXAMPLE
    Handle<ExampleData> pIn;
    iEvent.getByLabel("example",pIn);
@@ -118,6 +147,44 @@ RPCRecHitTimingAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup
    ESHandle<SetupData> pSetup;
    iSetup.get<SetupRecord>().get(pSetup);
 #endif
+   */
+
+   // RPC RecHit collection
+   edm::Handle<RPCRecHitCollection> rpcrechits;
+   if (!iEvent.getByToken(rpcrechitToken_, rpcrechits)) {
+     edm::LogWarning("RPCRecHitTimingAnalyzer") << "Problemos !"; 
+     return;
+   }
+
+   if (rpcrechits.isValid()) {
+     cout << "we are now rpcrechit-ing ;-)" << endl;
+
+     for (RPCRecHitCollection::const_iterator itRPCRecHit = rpcrechits->begin();
+	  itRPCRecHit != rpcrechits->end();
+	  ++itRPCRecHit) {
+       // do something with muon parameters, e.g, plot the charge.
+       // int charge = itTrack->charge();
+       //       myRPCRecHitTimingEvent[myRPCRecHitTimingEvent.NRPCRecHit] = itRPCRecHit->rpcId(); 
+       myRPCRecHitTimingEvent.RPCRecHitBunchX[myRPCRecHitTimingEvent.NRPCRecHit] = (Int_t) itRPCRecHit->BunchX();
+       myRPCRecHitTimingEvent.RPCRecHitTime[myRPCRecHitTimingEvent.NRPCRecHit] = (Float_t) itRPCRecHit->time();
+       myRPCRecHitTimingEvent.RPCRecHitTimeError[myRPCRecHitTimingEvent.NRPCRecHit] = (Float_t) itRPCRecHit->timeError();
+       myRPCRecHitTimingEvent.NRPCRecHit++;
+     }
+   
+   /*
+     for (const auto& rechits: *rpcrechits) {
+       DetId detId(rechits.id());
+       const GeomDetUnit* geomDetUnit = tGeom->IdToDetUnit(detId);
+
+       for (const auto& rechit: rechits) {
+	 if (!rechit.isValid()) continue;
+
+       }
+
+       }*/
+   }
+
+   myTree->Fill();
 }
 
 
@@ -125,12 +192,27 @@ RPCRecHitTimingAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup
 void
 RPCRecHitTimingAnalyzer::beginJob()
 {
+  OutputFile = new TFile("output/RPCRecHitTiming.root", "RECREATE");
+
+  myTree = new TTree("RPCRecHitTiming", "RPCRecHitTimingAnalyzer");
+  myTree->Branch("Event", &myRPCRecHitTimingEvent.Event, "Event/I");
+  myTree->Branch("Run", &myRPCRecHitTimingEvent.Run, "Run/I");
+
+  myTree->Branch("NRPCRecHit", &myRPCRecHitTimingEvent.NRPCRecHit, "NRPCRecHit/I");
+  myTree->Branch("RPCRecHitBunchX", &myRPCRecHitTimingEvent.RPCRecHitBunchX, "RPCRecHitBunchX[NRPCRecHit]/I");
+  myTree->Branch("RPCRecHitTime", &myRPCRecHitTimingEvent.RPCRecHitTime, "RPCRecHitTime[NRPCRecHit]/F");
+  myTree->Branch("RPCRecHitTimeError", &myRPCRecHitTimingEvent.RPCRecHitTimeError, "RPCRecHitTimeError[NRPCRecHit]/F");
+  
+  myTree->Branch("NMuon", &myRPCRecHitTimingEvent.NMuon, "NMuon/I");
+  myTree->Branch("MuonCharge", &myRPCRecHitTimingEvent.MuonCharge, "MuonCharge[NMuon]/I");
+  myTree->Branch("MuonRPCTimeAtIpInOut", &myRPCRecHitTimingEvent.MuonRPCTimeAtIpInOut, "MuonRPCTimeAtIpInOut[NMuon]/F");
 }
 
 // ------------ method called once each job just after ending the event loop  ------------
 void
 RPCRecHitTimingAnalyzer::endJob()
 {
+  OutputFile->Write();
 }
 
 // ------------ method fills 'descriptions' with the allowed parameters for the module  ------------
