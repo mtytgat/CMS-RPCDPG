@@ -35,6 +35,7 @@
 #include "DataFormats/TrackReco/interface/TrackExtra.h"
 #include "DataFormats/TrackReco/interface/TrackExtraFwd.h"
 
+#include "DataFormats/TrackingRecHit/interface/TrackingRecHit.h"
 #include "DataFormats/TrackingRecHit/interface/TrackingRecHitFwd.h"
 
 #include "DataFormats/MuonReco/interface/Muon.h"
@@ -148,7 +149,15 @@ RPCRecHitTimingAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup
 
      reco::TrackRef muonTrack = itMuon->combinedMuon();
      cout << "number of muon track hits: " << muonTrack->recHitsSize() << endl;  
-
+     /*for (trackingRecHit_iterator itTrackRecHit = muonTrack->recHitsBegin();
+	  itTrackRecHit != muonTrack->recHitsEnd();
+	  ++itTrackRecHit) {
+       cout << "rechit: " << endl;
+       itTrackRecHit->
+       }*/
+     for (const auto& TrackRecHit : muonTrack->recHits()) {
+       cout << "TrackRecHit Id: " << TrackRecHit->rawId() << endl;
+     }
      myRPCRecHitTimingEvent.MuonCharge[myRPCRecHitTimingEvent.NMuon] = (Int_t) itMuon->charge();
 
      // Muon timing info: DT/CSC and RPC 
@@ -189,13 +198,16 @@ RPCRecHitTimingAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup
      for (RPCRecHitCollection::const_iterator itRPCRecHit = rpcrechits->begin();
 	  itRPCRecHit != rpcrechits->end();
 	  ++itRPCRecHit) {
-       // do something with muon parameters, e.g, plot the charge.
-       // int charge = itTrack->charge();
-       //       myRPCRecHitTimingEvent[myRPCRecHitTimingEvent.NRPCRecHit] = itRPCRecHit->rpcId(); 
+
        myRPCRecHitTimingEvent.RPCRecHitBunchX[myRPCRecHitTimingEvent.NRPCRecHit] = (Int_t) itRPCRecHit->BunchX();
        myRPCRecHitTimingEvent.RPCRecHitTime[myRPCRecHitTimingEvent.NRPCRecHit] = (Float_t) itRPCRecHit->time();
        myRPCRecHitTimingEvent.RPCRecHitTimeError[myRPCRecHitTimingEvent.NRPCRecHit] = (Float_t) itRPCRecHit->timeError();
        myRPCRecHitTimingEvent.NRPCRecHit++;
+
+       // TrackingRecHits
+       // this is a "ConstRecHitContainer"
+       std::vector<const TrackingRecHit*> trackingRecHits = itRPCRecHit->recHits();
+
      }
    
    /*
@@ -232,6 +244,7 @@ RPCRecHitTimingAnalyzer::beginJob()
   myTree->Branch("RPCRecHitTimeError", &myRPCRecHitTimingEvent.RPCRecHitTimeError, "RPCRecHitTimeError[NRPCRecHit]/F");
   
   myTree->Branch("NMuon", &myRPCRecHitTimingEvent.NMuon, "NMuon/I");
+  myTree->Branch("MuonType", &myRPCRecHitTimingEvent.MuonType, "MuonType[NMuon]/I");
   myTree->Branch("MuonCharge", &myRPCRecHitTimingEvent.MuonCharge, "MuonCharge[NMuon]/I");
   myTree->Branch("MuonTimeValid", &myRPCRecHitTimingEvent.MuonTimeValid, "MuonTimeValid[NMuon]/B");
   myTree->Branch("MuonTimeAtIpInOut", &myRPCRecHitTimingEvent.MuonTimeAtIpInOut, "MuonTimeAtIpInOut[NMuon]/F");
