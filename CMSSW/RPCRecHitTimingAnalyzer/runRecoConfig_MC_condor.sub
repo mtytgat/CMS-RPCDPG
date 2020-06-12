@@ -1,0 +1,8 @@
+Proxy_path	= /afs/cern.ch/user/m/mtytgat/private/x509up
+arguments	= $(Proxy_path) $(ClusterId)$(ProcId)
+executable	= runRecoConfig_MC_condor.sh
+output		= runRecoConfig_MC_condor.$(ClusterId)$(ProcId).out
+error		= runRecoConfig_MC_condor.$(ClusterId)$(ProcId).err
+log		= runRecoConfig_MC_condor.$(ClusterId)$(ProcId).log
++JobFlavour	= "workday"
+queue
