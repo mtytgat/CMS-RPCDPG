@@ -20,8 +20,8 @@ process.GlobalTag = GlobalTag(process.GlobalTag, '102X_dataRun2_Prompt_v15', '')
 
 process.MessageLogger = cms.Service("MessageLogger",
     debugModules = cms.untracked.vstring('*'),
-    destinations = cms.untracked.vstring('RPCRecHitTiming'),
-    RPCRecHitTiming = cms.untracked.PSet(
+    destinations = cms.untracked.vstring('RPCRecHitTimingAnalyzer'),
+    RPCRecHitTimingAnalyzer = cms.untracked.PSet(
         threshold = cms.untracked.string('DEBUG')
     )
 )

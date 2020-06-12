@@ -25,12 +25,21 @@
 #include "FWCore/Framework/interface/one/EDAnalyzer.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
+
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
+
 #include "FWCore/Utilities/interface/InputTag.h"
+
 #include "DataFormats/TrackReco/interface/Track.h"
 #include "DataFormats/TrackReco/interface/TrackFwd.h"
+#include "DataFormats/TrackReco/interface/TrackExtra.h"
+#include "DataFormats/TrackReco/interface/TrackExtraFwd.h"
+
+#include "DataFormats/TrackingRecHit/interface/TrackingRecHitFwd.h"
+
 #include "DataFormats/MuonReco/interface/Muon.h"
 #include "DataFormats/MuonReco/interface/MuonFwd.h"
+
 #include "DataFormats/RPCRecHit/interface/RPCRecHitCollection.h"
 
 #include <TFile.h>
@@ -49,6 +58,7 @@
 
 using reco::TrackCollection;
 using reco::MuonCollection;
+using namespace std;
 
 class RPCRecHitTimingAnalyzer : public edm::one::EDAnalyzer<edm::one::SharedResources>  {
 public:
@@ -71,6 +81,7 @@ private:
   edm::EDGetTokenT<reco::TrackCollection> muontrackToken_;  
   edm::EDGetTokenT<RPCRecHitCollection> rpcrechitToken_;
 
+  std::string OutputFileName;
   TFile* OutputFile;
   TTree* myTree;
   myRPCRecHitTimingEvent_t myRPCRecHitTimingEvent;
@@ -88,6 +99,7 @@ private:
 // constructors and destructor
 //
 RPCRecHitTimingAnalyzer::RPCRecHitTimingAnalyzer(const edm::ParameterSet& iConfig)
+  : OutputFileName(iConfig.getParameter<edm::ParameterSet>("RPCRecHitTimingParameters").getUntrackedParameter<std::string>("outputfile", std::string("output/RPCRecHitTimingAnalyzer.root")))
 {
   muonlabel_ = iConfig.getParameter<edm::ParameterSet>("RPCRecHitTimingParameters").getUntrackedParameter<edm::InputTag>("muons");
   muontracklabel_ = iConfig.getParameter<edm::ParameterSet>("RPCRecHitTimingParameters").getUntrackedParameter<edm::InputTag>("muontracks");
@@ -116,7 +128,6 @@ void
 RPCRecHitTimingAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
    using namespace edm;
-   using namespace std;
 
    myRPCRecHitTimingEvent.NRPCRecHit = 0;
    myRPCRecHitTimingEvent.NMuon = 0;
@@ -130,10 +141,26 @@ RPCRecHitTimingAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup
    for (MuonCollection::const_iterator itMuon = muons->begin();
        itMuon != muons->end();
        ++itMuon) {
+
+     // muon track info
+     if (itMuon->combinedMuon().isNull()) continue;
+     myRPCRecHitTimingEvent.MuonType[myRPCRecHitTimingEvent.NMuon] = (Int_t) itMuon->type();
+
+     reco::TrackRef muonTrack = itMuon->combinedMuon();
+     cout << "number of muon track hits: " << muonTrack->recHitsSize() << endl;  
+
      myRPCRecHitTimingEvent.MuonCharge[myRPCRecHitTimingEvent.NMuon] = (Int_t) itMuon->charge();
+
+     // Muon timing info: DT/CSC and RPC 
+     myRPCRecHitTimingEvent.MuonTimeValid[myRPCRecHitTimingEvent.NMuon] = (Bool_t) itMuon->isTimeValid();
+
+     reco::MuonTime muontime = itMuon->time();
+     myRPCRecHitTimingEvent.MuonTimeAtIpInOut[myRPCRecHitTimingEvent.NMuon] = (Float_t) muontime.timeAtIpInOut;
 
      reco::MuonTime muonrpctime = itMuon->rpcTime();
      myRPCRecHitTimingEvent.MuonRPCTimeAtIpInOut[myRPCRecHitTimingEvent.NMuon] = (Float_t) muonrpctime.timeAtIpInOut;
+     
+     // done
      myRPCRecHitTimingEvent.NMuon++;
    }
 
@@ -192,7 +219,8 @@ RPCRecHitTimingAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup
 void
 RPCRecHitTimingAnalyzer::beginJob()
 {
-  OutputFile = new TFile("output/RPCRecHitTiming.root", "RECREATE");
+  std::cout << "Using " << OutputFileName.c_str() << std::endl;
+  OutputFile = new TFile(OutputFileName.c_str(), "RECREATE");
 
   myTree = new TTree("RPCRecHitTiming", "RPCRecHitTimingAnalyzer");
   myTree->Branch("Event", &myRPCRecHitTimingEvent.Event, "Event/I");
@@ -205,6 +233,8 @@ RPCRecHitTimingAnalyzer::beginJob()
   
   myTree->Branch("NMuon", &myRPCRecHitTimingEvent.NMuon, "NMuon/I");
   myTree->Branch("MuonCharge", &myRPCRecHitTimingEvent.MuonCharge, "MuonCharge[NMuon]/I");
+  myTree->Branch("MuonTimeValid", &myRPCRecHitTimingEvent.MuonTimeValid, "MuonTimeValid[NMuon]/B");
+  myTree->Branch("MuonTimeAtIpInOut", &myRPCRecHitTimingEvent.MuonTimeAtIpInOut, "MuonTimeAtIpInOut[NMuon]/F");
   myTree->Branch("MuonRPCTimeAtIpInOut", &myRPCRecHitTimingEvent.MuonRPCTimeAtIpInOut, "MuonRPCTimeAtIpInOut[NMuon]/F");
 }
 

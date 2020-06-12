@@ -15,7 +15,10 @@ struct myRPCRecHitTimingEvent_t {
 
   Int_t NMuon;
   Int_t MuonCharge[MaxNMuon];
+  Int_t MuonType[MaxNMuon];
+  Bool_t MuonTimeValid[MaxNMuon];
   Float_t MuonTimeAtIpInOut[MaxNMuon];
+  Float_t MuonRPCTimeAtIpInOut[MaxNMuon];
 };
 
 #endif
