@@ -43,6 +43,9 @@
 
 #include "DataFormats/RPCRecHit/interface/RPCRecHitCollection.h"
 
+#include "DataFormats/HepMCCandidate/interface/GenParticle.h"
+#include "DataFormats/HepMCCandidate/interface/GenParticleFwd.h"
+
 #include <TFile.h>
 #include <TTree.h>
 
@@ -59,6 +62,7 @@
 
 using reco::TrackCollection;
 using reco::MuonCollection;
+using reco::GenParticleCollection;
 using namespace std;
 
 class RPCRecHitTimingAnalyzer : public edm::one::EDAnalyzer<edm::one::SharedResources>  {
@@ -81,6 +85,7 @@ private:
   edm::EDGetTokenT<reco::MuonCollection> muonToken_;  
   edm::EDGetTokenT<reco::TrackCollection> muontrackToken_;  
   edm::EDGetTokenT<RPCRecHitCollection> rpcrechitToken_;
+  edm::EDGetTokenT<GenParticleCollection> genparticleToken_;
 
   std::string OutputFileName;
   TFile* OutputFile;
@@ -109,6 +114,7 @@ RPCRecHitTimingAnalyzer::RPCRecHitTimingAnalyzer(const edm::ParameterSet& iConfi
   muonToken_ = consumes<reco::MuonCollection>(muonlabel_);
   muontrackToken_ = consumes<reco::TrackCollection>(muontracklabel_);
   rpcrechitToken_ = consumes<RPCRecHitCollection>(iConfig.getParameter<edm::ParameterSet>("RPCRecHitTimingParameters").getUntrackedParameter<edm::InputTag>("rpcrechits"));
+  genparticleToken_ = consumes<GenParticleCollection>(iConfig.getParameter<edm::ParameterSet>("RPCRecHitTimingParameters").getUntrackedParameter<edm::InputTag>("genparticles"));
 
 }
 
@@ -137,6 +143,15 @@ RPCRecHitTimingAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup
 
    cout << "Working on event number: " << iEvent.id().event() << endl;
 
+   // start with genparticle information
+   Handle<reco::GenParticleCollection> genparticles;
+   iEvent.getByToken(genparticleToken_, genparticles);
+   for (GenParticleCollection::const_iterator itGenParticle = genparticles->begin(); 
+	itGenParticle != genparticles->end();
+	++itGenParticle) {
+     cout << "genParticle: " << itGenParticle->pdgId() << endl;
+   } 
+
    Handle<reco::MuonCollection> muons;
    iEvent.getByToken(muonToken_, muons);
    for (MuonCollection::const_iterator itMuon = muons->begin();
@@ -144,10 +159,12 @@ RPCRecHitTimingAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup
        ++itMuon) {
 
      // muon track info
-     if (itMuon->combinedMuon().isNull()) continue;
+     // In current MuonTimingFiller::fillRPCTime only standAloneMuons are used for RPC timing
+     //if (itMuon->combinedMuon().isNull()) continue;
+     if (itMuon->standAloneMuon().isNull()) continue;
      myRPCRecHitTimingEvent.MuonType[myRPCRecHitTimingEvent.NMuon] = (Int_t) itMuon->type();
 
-     reco::TrackRef muonTrack = itMuon->combinedMuon();
+     reco::TrackRef muonTrack = itMuon->standAloneMuon();
      cout << "number of muon track hits: " << muonTrack->recHitsSize() << endl;  
      /*for (trackingRecHit_iterator itTrackRecHit = muonTrack->recHitsBegin();
 	  itTrackRecHit != muonTrack->recHitsEnd();

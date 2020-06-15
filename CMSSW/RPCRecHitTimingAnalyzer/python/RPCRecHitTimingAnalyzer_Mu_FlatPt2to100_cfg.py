@@ -42,7 +42,8 @@ process.RPCRecHitTiming = cms.EDAnalyzer('RPCRecHitTimingAnalyzer',
         outputfile = cms.untracked.string("output/RPCRecHitTimingAnalyzer_Mu_Flat_Pt2to100-pythia8-gun.root"), 
         muons = cms.untracked.InputTag("muons"),
         muontracks = cms.untracked.InputTag("standAloneMuons"),
-        rpcrechits = cms.untracked.InputTag("rpcRecHits")
+        rpcrechits = cms.untracked.InputTag("rpcRecHits"),
+        genparticles = cms.untracked.InputTag("genParticles","")
     )
 )
 
