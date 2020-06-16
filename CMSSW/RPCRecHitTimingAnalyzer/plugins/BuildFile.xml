@@ -8,6 +8,8 @@
 <use name="DataFormats/MuonReco"/>
 <use name="DataFormats/RPCRecHit"/>
 <use name="DataFormats/HepMCCandidate"/>
+<use name="SimDataFormats/TrackingHit"/>
+<use name="SimDataFormats/Track"/>
 <library file="RPCRecHitTimingAnalyzer.cc" name="RPCRecHitTimingAnalyzer">
   <flags EDM_PLUGIN="1"/>
 </library>

@@ -43,7 +43,9 @@ process.RPCRecHitTiming = cms.EDAnalyzer('RPCRecHitTimingAnalyzer',
         muons = cms.untracked.InputTag("muons"),
         muontracks = cms.untracked.InputTag("standAloneMuons"),
         rpcrechits = cms.untracked.InputTag("rpcRecHits"),
-        genparticles = cms.untracked.InputTag("genParticles","")
+        genparticles = cms.untracked.InputTag("genParticles",""),
+        rpcsimhits = cms.untracked.InputTag("g4SimHits","MuonRPCHits"),
+        simtracks = cms.untracked.InputTag("g4SimHits")
     )
 )
 

@@ -46,6 +46,9 @@
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
 #include "DataFormats/HepMCCandidate/interface/GenParticleFwd.h"
 
+#include "SimDataFormats/TrackingHit/interface/PSimHitContainer.h"
+#include "SimDataFormats/Track/interface/SimTrackContainer.h"
+
 #include <TFile.h>
 #include <TTree.h>
 
@@ -86,6 +89,8 @@ private:
   edm::EDGetTokenT<reco::TrackCollection> muontrackToken_;  
   edm::EDGetTokenT<RPCRecHitCollection> rpcrechitToken_;
   edm::EDGetTokenT<GenParticleCollection> genparticleToken_;
+  edm::EDGetTokenT<edm::PSimHitContainer> rpcsimhitToken_;
+  edm::EDGetTokenT<edm::SimTrackContainer> simtrackToken_;
 
   std::string OutputFileName;
   TFile* OutputFile;
@@ -115,6 +120,8 @@ RPCRecHitTimingAnalyzer::RPCRecHitTimingAnalyzer(const edm::ParameterSet& iConfi
   muontrackToken_ = consumes<reco::TrackCollection>(muontracklabel_);
   rpcrechitToken_ = consumes<RPCRecHitCollection>(iConfig.getParameter<edm::ParameterSet>("RPCRecHitTimingParameters").getUntrackedParameter<edm::InputTag>("rpcrechits"));
   genparticleToken_ = consumes<GenParticleCollection>(iConfig.getParameter<edm::ParameterSet>("RPCRecHitTimingParameters").getUntrackedParameter<edm::InputTag>("genparticles"));
+  rpcsimhitToken_ = consumes<edm::PSimHitContainer>(iConfig.getParameter<edm::ParameterSet>("RPCRecHitTimingParameters").getUntrackedParameter<edm::InputTag>("rpcsimhits"));
+  simtrackToken_ = consumes<edm::SimTrackContainer>(iConfig.getParameter<edm::ParameterSet>("RPCRecHitTimingParameters").getUntrackedParameter<edm::InputTag>("simtracks"));
 
 }
 
@@ -135,6 +142,7 @@ void
 RPCRecHitTimingAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
    using namespace edm;
+   using namespace reco;
 
    myRPCRecHitTimingEvent.NRPCRecHit = 0;
    myRPCRecHitTimingEvent.NMuon = 0;
@@ -143,15 +151,36 @@ RPCRecHitTimingAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup
 
    cout << "Working on event number: " << iEvent.id().event() << endl;
 
+
+   // sim stuff: SimHits (RPC) -> SimTracks -> GenParticle seems possible (identify which simhits are effectively linked to generated muons)
    // start with genparticle information
    Handle<reco::GenParticleCollection> genparticles;
    iEvent.getByToken(genparticleToken_, genparticles);
    for (GenParticleCollection::const_iterator itGenParticle = genparticles->begin(); 
 	itGenParticle != genparticles->end();
 	++itGenParticle) {
-     cout << "genParticle: " << itGenParticle->pdgId() << endl;
+     cout << "genParticle id: " << itGenParticle->pdgId() << endl;
    } 
 
+   // Tracking SimHits for RPC
+   Handle<edm::PSimHitContainer> rpcsimhits;
+   iEvent.getByToken(rpcsimhitToken_, rpcsimhits);
+   for (const auto& rpcSimHit : *rpcsimhits) {
+     cout << "rpcSimHit type: " << rpcSimHit.particleType() 
+	  << " detUnitId: " << rpcSimHit.detUnitId() 
+	  << " trackId: " << rpcSimHit.trackId() 
+	  << endl;
+   }
+   
+   // SimTracks
+   Handle<edm::SimTrackContainer> simtracks;
+   iEvent.getByToken(simtrackToken_, simtracks);
+   for (const auto& simTrack : *simtracks) {
+     cout << "simTrack: " << simTrack.trackId() << " " << simTrack.type() << " " 
+	  << simTrack.genpartIndex() << endl;
+   }
+
+   // now the reco stuff
    Handle<reco::MuonCollection> muons;
    iEvent.getByToken(muonToken_, muons);
    for (MuonCollection::const_iterator itMuon = muons->begin();
@@ -224,6 +253,12 @@ RPCRecHitTimingAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup
        // TrackingRecHits
        // this is a "ConstRecHitContainer"
        std::vector<const TrackingRecHit*> trackingRecHits = itRPCRecHit->recHits();
+       
+       for (const auto& trackingrechit : trackingRecHits) {
+	 cout << "RPC trackingrechit ID: " << trackingrechit->rawId() << endl;
+       }
+
+
 
      }
    
